@@ -1,13 +1,16 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 from typing import Literal, Annotated
 import pickle
 import pandas as pd
 
 # import the ml model
-with open('model.pkl', 'rb') as f:
+with open('model/model.pkl', 'rb') as f:
     model = pickle.load(f)
+
+# MLFlow metadata
+MODEL_VERSION = '1.0.0'
 
 app = FastAPI()
 
@@ -33,6 +36,11 @@ class UserInput(BaseModel):
     occupation: Annotated[Literal['retired', 'freelancer', 'student', 'government_job',
        'business_owner', 'unemployed', 'private_job'], Field(..., description='Occupation of the user')]
     
+    @field_validator('city')
+    @classmethod
+    def normalize_city(cls, value) -> str:
+        return value.strip().title()
+
     @computed_field
     @property
     def bmi(self) -> float:
@@ -68,6 +76,18 @@ class UserInput(BaseModel):
             return 2
         else:
             return 3
+        
+@app.get('/')
+def home():
+    return JSONResponse(status_code=200, content={'message': 'Welcome to the Insurance Premium Prediction API. Use the /predict endpoint to get predictions.'})
+
+@app.get('/health')
+def health_check():
+    return JSONResponse(status_code=200, 
+                        content={'status': 'OK',
+                                 'model_version': MODEL_VERSION,
+                                 'model_loaded': model is not None
+                                 })
 
 @app.post('/predict')
 def predict_premium(data: UserInput):
@@ -84,8 +104,3 @@ def predict_premium(data: UserInput):
     prediction = model.predict(input_df)[0]
 
     return JSONResponse(status_code=200, content={'predicted_category': prediction})
-
-
-
-
-
