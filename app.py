@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 import pickle
 import pandas as pd
 from schema.user_input import UserInput
+from schema.prediction_response import PredictionResponse
 from model.predict import predict_output, MODEL_VERSION, model
 
 app = FastAPI()
@@ -19,7 +20,7 @@ def health_check():
                                  'model_loaded': model is not None
                                  })
 
-@app.post('/predict')
+@app.post('/predict', response_model=PredictionResponse)
 def predict_premium(data: UserInput):
 
     user_input ={
@@ -31,6 +32,9 @@ def predict_premium(data: UserInput):
         'occupation': data.occupation
     }
 
-    prediction = predict_output(user_input)
-
-    return JSONResponse(status_code=200, content={'predicted_category': prediction})
+    try:
+        prediction = predict_output(user_input)
+        return JSONResponse(status_code=200, content={'response': prediction})
+    
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
